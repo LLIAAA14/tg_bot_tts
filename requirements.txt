@@ -1,0 +1,6 @@
+aiogram>=3.0.0
+torch>=1.9
+soundfile
+num2words
+omegaconf
+python-dotenv
