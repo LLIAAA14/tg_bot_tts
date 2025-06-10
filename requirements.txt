@@ -1,5 +1,5 @@
 aiogram>=3.0.0
-torch>=1.9
+torch>=1.9+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
 soundfile
 num2words
 omegaconf
