@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 LIMITS_FILE = Path("user_limits.json")
-FREE_LIMIT = 30  # Новым пользователям теперь даётся 30 бесплатных озвучек
-FLOOD_SECONDS = 5  # интервал между озвучками в секундах
+FREE_LIMIT = 30
+FLOOD_SECONDS = 5
 
 def load_limits():
     if LIMITS_FILE.exists():
@@ -19,16 +19,6 @@ def save_limits(data):
 def now_iso():
     return datetime.utcnow().isoformat()
 
-def need_reset(last_reset):
-    """True если прошло 7 дней с последнего сброса."""
-    if not last_reset:
-        return True
-    try:
-        dt = datetime.fromisoformat(last_reset)
-    except Exception:
-        return True
-    return datetime.utcnow() - dt > timedelta(days=7)
-
 def get_user_limit(user_id):
     user_limits = load_limits()
     s_id = str(user_id)
@@ -37,16 +27,10 @@ def get_user_limit(user_id):
         user_limits[s_id] = {
             "used": 0,
             "purchased": 0,
-            "last_free_reset": now_iso(),
             "last_request": None
         }
         save_limits(user_limits)
         return user_limits[s_id]
-    if need_reset(u.get("last_free_reset")):
-        u["used"] = 0
-        u["last_free_reset"] = now_iso()
-        user_limits[s_id] = u
-        save_limits(user_limits)
     if "last_request" not in u:
         u["last_request"] = None
         user_limits[s_id] = u
@@ -83,19 +67,6 @@ def add_purchased(user_id, amount):
     limit["purchased"] += amount
     user_limits[s_id] = limit
     save_limits(user_limits)
-
-MOSCOW_TZ = timezone(timedelta(hours=3))  # Москва: UTC+3
-def get_next_free_reset(user_id):
-    limit = get_user_limit(user_id)
-    last = limit.get("last_free_reset")
-    try:
-        last_dt = datetime.fromisoformat(last)
-        next_dt = last_dt + timedelta(days=7)
-        # Преобразуем к Московскому времени:
-        next_dt = next_dt.replace(tzinfo=timezone.utc).astimezone(MOSCOW_TZ)
-        return next_dt.strftime('%d.%m.%Y %H:%M')
-    except Exception:
-        return "неизвестно"
 
 # АНТИФЛУД
 def get_last_request(user_id):
