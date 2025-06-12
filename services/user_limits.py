@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 LIMITS_FILE = Path("user_limits.json")
-FREE_LIMIT = 20
+FREE_LIMIT = 30  # Новым пользователям теперь даётся 30 бесплатных озвучек
 FLOOD_SECONDS = 5  # интервал между озвучками в секундах
 
 def load_limits():
