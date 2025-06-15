@@ -72,11 +72,11 @@ async def handle_language(callback: CallbackQuery):
         "aidar": "Айдар (RU)",
         "baya": "Бая (RU)",
         "kseniya": "Ксения (RU)",
-        "xenia": "Ксения (RU)",
+        "xenia": "Ксения1 (RU)",
         "eugene": "Евгений (RU)",
         "random": "Случайный (RU)",
-        "en_0": "Female (EN)",
-        "en_1": "Male (EN)",
+        "en_0": "Женский (EN)",
+        "en_1": "Мужской (EN)",
     }
     for v in speakers:
         kb.button(text=speaker_names.get(v, v.capitalize()), callback_data=f"voice_{v}")
@@ -84,7 +84,8 @@ async def handle_language(callback: CallbackQuery):
     lang_name = "русском" if lang == "ru" else "английском"
     await callback.message.answer(
         f"Вы выбрали <b>{'Русский' if lang == 'ru' else 'Английский'}</b> язык.\n"
-        "Присылайте боту текст только на соответствующем языке. Текст на других языках бот игнорирует.\n\n"
+        "Присылайте боту текст только на соответствующем языке. Текст на других языках бот игнорирует.\n"
+        "Для изменения ударения используйте '+' перед гласной. Для создания паузы используйте '.-'"
         f"Теперь выберите голос для озвучивания на {lang_name} языке:",
         parse_mode=ParseMode.HTML,
         reply_markup=kb.as_markup()
@@ -202,7 +203,6 @@ async def help_handler(message: Message):
 async def other_nets(message: Message):
     text = (
         "<b>Другие нейросети и боты:</b>\n\n"
-        "🤖 <a href='https://t.me/your_voicebot_en'>Озвучка на английском</a>\n"
         "🎨 <a href='https://t.me/your_imagegen_bot'>Генерация картинок</a>\n"
         "🎧 <a href='https://t.me/your_musicbot'>Генерация музыки</a>\n"
         "💬 <a href='https://t.me/your_chatbot'>AI-чат</a>\n"
