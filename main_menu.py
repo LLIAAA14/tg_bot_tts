@@ -6,8 +6,10 @@ from aiogram.enums import ParseMode
 from config import PROVIDER_TOKEN, SPEAKERS
 from models.silero_tts import synthesize_speech
 from utils.normalizer import normalize_numbers
-from services.analytics import increment_tts, increment_purchase
-from services.user_limits import (
+from services.analytics_db import (
+    get_stats, increment_tts, increment_purchase, register_user
+)
+from services.user_limits_db import (
     get_left, get_user_limit,
     add_used, can_speak, can_request, set_last_request, seconds_to_wait, add_purchased
 )
@@ -188,6 +190,8 @@ async def help_handler(message: Message):
         "<b>Баланс и покупки:</b>\n"
         "• Узнать остаток озвучек — \"Мой баланс\"\n"
         "• Купить дополнительные озвучки — \"Купить озвучки\"\n\n"
+        "<b>Перезагрузить бота:</b>\n"
+        "•/start\n\n"
         "<b>Частые вопросы:</b>\n"
         "• <i>Не приходит озвучка?</i> — Проверьте, не превышен ли лимит, и подождите немного, чтобы не попасть под антифлуд\n"
         "• <i>Не проходит оплата?</i> — Попробуйте ещё раз или напишите в поддержку\n\n"
