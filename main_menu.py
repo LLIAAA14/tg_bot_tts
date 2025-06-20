@@ -206,10 +206,10 @@ async def help_handler(message: Message):
 async def other_nets(message: Message):
     text = (
         "<b>Другие нейросети и боты:</b>\n\n"
-        "🤖 <a href='https://t.me/your_voicebot_en'>Озвучка на английском</a>\n"
-        "🎨 <a href='https://t.me/your_imagegen_bot'>Генерация картинок</a>\n"
-        "🎧 <a href='https://t.me/your_musicbot'>Генерация музыки</a>\n"
-        "💬 <a href='https://t.me/your_chatbot'>AI-чат</a>\n"
+        #"🤖 <a href='https://t.me/your_voicebot_en'>Озвучка на английском</a>\n"
+        #"🎨 <a href='https://t.me/your_imagegen_bot'>Генерация картинок</a>\n"
+        #"🎧 <a href='https://t.me/your_musicbot'>Генерация музыки</a>\n"
+        #"💬 <a href='https://t.me/your_chatbot'>AI-чат</a>\n"
     )
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
