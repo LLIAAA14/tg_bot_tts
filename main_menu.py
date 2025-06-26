@@ -16,14 +16,46 @@ from services.user_limits_db import (
 
 router = Router()
 user_speakers = {}
-user_languages = {}  # Добавляем хранение выбранного языка
+user_languages = {}
+
+speaker_names = {
+    # RU
+    "aidar": "👨Михаил",
+    "baya": "👱‍♀️Ольга",
+    "kseniya": "👱‍♀️Ксения",
+    "xenia": "👱‍♀️Алла",
+    "eugene": "👨Евгений",
+    # EN
+    "en_0": "👱‍♀️Сьюзен",
+    "en_1": "👨Бил",
+    "en_2": "👨Дэвид",
+    "en_3": "👱‍♀️Эшли",
+    "en_4": "👱‍♀️Мэг",
+    # DE
+    "bernd_ungerer": "👨Бернд",
+    "eva_k": "👱‍♀️Ева",
+    "friedrich": "👨Фридрих",
+    "hokuspokus": "👱‍♀️Ханна",
+    "karlsson": "👨Карлссон",
+    # FR
+    "fr_0": "👨Филипп",
+    "fr_1": "👨Патрик",
+    "fr_2": "👨Даниэль",
+    "fr_3": "👨Алан",
+    "fr_4": "👱‍♀️Анет",
+    "fr_5": "👱‍♀️Вивьен",
+    # ES
+    "es_0": "👨Луис",
+    "es_1": "👨Диего",
+    "es_2": "👨Педро"
+}
 
 def get_main_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Озвучить текст")],
-            [KeyboardButton(text="Мой баланс"), KeyboardButton(text="Купить озвучки")],
-            [KeyboardButton(text="Помощь"), KeyboardButton(text="Другие нейросети")],
+            [KeyboardButton(text="🗣 Озвучить текст")],
+            [KeyboardButton(text="💼 Мой баланс"), KeyboardButton(text="💰 Купить озвучки")],
+            [KeyboardButton(text="🆘 Помощь"), KeyboardButton(text="📃 Другие нейросети")],
         ],
         resize_keyboard=True,
         one_time_keyboard=False,
@@ -32,15 +64,17 @@ def get_main_menu():
 
 @router.message(Command("start"))
 async def start(message: Message):
+    user_name = message.from_user.first_name or ""
     about_text = (
-        "🤖 <b>Привет! Я голосовой бот, который озвучит любой твой текст разными голосами.</b>\n\n"
-        "Озвучивает ваш текст с помощью нейросетей!\n"
-        "1. Сначала выберите язык и голос ('Озвучить текст')\n"
-        "2. Затем отправьте текст (до 500 символов)\n"
-        "3. Получите аудиофайл\n\n"
+        f"🤖 <b>Привет, {user_name}!\n\n"
+        "Я — твой голосовой помощник. Озвучу любой твой текст разными голосами и на разных языках — быстро и качественно!</b>\n\n"
+        "Как пользоваться ботом:\n"
+        "1️⃣ Сначала выберите язык и голос (Озвучить текст)\n"
+        "2️⃣ Затем отправьте текст (до 500 символов)\n"
+        "3️⃣ Получите аудиофайл\n\n"
         "Вам доступно <b>30 бесплатных озвучек</b>!\n"
-        "Можно купить ещё озвучки ('Купить озвучки')\n\n"
-        "Статистика по вашим озвучкам ('Мой баланс')"
+        "Можно купить ещё озвучки (Купить озвучки)\n\n"
+        "Статистика по вашим озвучкам (Мой баланс)"
     )
     await message.answer(
         about_text,
@@ -48,12 +82,15 @@ async def start(message: Message):
         parse_mode=ParseMode.HTML
     )
 
-@router.message(F.text == "Озвучить текст")
+@router.message(F.text == "🗣 Озвучить текст")
 async def handle_tts(message: Message):
-    # Показываем выбор языка
+    # Показываем выбор языка - все поддерживаемые языки Silero TTS
     kb = InlineKeyboardBuilder()
     kb.button(text="Русский 🇷🇺", callback_data="lang_ru")
     kb.button(text="Английский 🇬🇧", callback_data="lang_en")
+    kb.button(text="Немецкий 🇩🇪", callback_data="lang_de")
+    kb.button(text="Французский 🇫🇷", callback_data="lang_fr")
+    kb.button(text="Испанский 🇪🇸", callback_data="lang_es")
     kb.adjust(2)
     await message.answer(
         "Выберите язык для озвучки:",
@@ -64,30 +101,27 @@ async def handle_tts(message: Message):
 async def handle_language(callback: CallbackQuery):
     user_id = callback.from_user.id
     lang = callback.data.replace("lang_", "")
-    user_languages[user_id] = lang  # Запоминаем язык для пользователя
+    user_languages[user_id] = lang
 
-    # Предлагаем выбрать голос для выбранного языка
     kb = InlineKeyboardBuilder()
     speakers = SPEAKERS.get(lang, [])
-    speaker_names = {
-        # Имена для отображения (можно вынести в config)
-        "aidar": "Айдар (RU)",
-        "baya": "Бая (RU)",
-        "kseniya": "Ксения (RU)",
-        "xenia": "Ксения (RU)",
-        "eugene": "Евгений (RU)",
-        "random": "Случайный (RU)",
-        "en_0": "Female (EN)",
-        "en_1": "Male (EN)",
-    }
     for v in speakers:
         kb.button(text=speaker_names.get(v, v.capitalize()), callback_data=f"voice_{v}")
     kb.adjust(2)
-    lang_name = "русском" if lang == "ru" else "английском"
+    lang_map = {
+        "ru": "русском", "en": "английском", "de": "немецком", "fr": "французском",
+        "es": "испанском"
+    }
+    lang_label = {
+        "ru": "Русский", "en": "Английский", "de": "Немецкий", "fr": "Французский",
+        "es": "Испанский"
+    }
     await callback.message.answer(
-        f"Вы выбрали <b>{'Русский' if lang == 'ru' else 'Английский'}</b> язык.\n"
+        f"Вы выбрали <b>{lang_label.get(lang, lang.capitalize())}</b> язык.\n\n"
         "Присылайте боту текст только на соответствующем языке. Текст на других языках бот игнорирует.\n\n"
-        f"Теперь выберите голос для озвучивания на {lang_name} языке:",
+        "Для изменения ударения добавьте '+' перед гласной.\n"
+        "Для добавления паузы '.-'.\n\n"
+        f"Теперь выберите голос для озвучивания на {lang_map.get(lang, lang)} языке:",
         parse_mode=ParseMode.HTML,
         reply_markup=kb.as_markup()
     )
@@ -99,14 +133,18 @@ async def set_voice(callback: CallbackQuery):
     speaker = callback.data.replace("voice_", "")
     user_speakers[user_id] = speaker
     lang = user_languages.get(user_id, "ru")
-    lang_name = "Русский" if lang == "ru" else "Английский"
+    lang_label = {
+        "ru": "Русский", "en": "Английский", "de": "Немецкий", "fr": "Французский",
+        "es": "Испанский"
+    }
+    speaker_display = speaker_names.get(speaker, speaker.capitalize())
     await callback.message.answer(
-        f"✅ Голос <b>{speaker.capitalize()}</b> выбран ({lang_name}).\nТеперь пришлите текст для озвучки (до 500 символов).",
+        f"✅ Голос <b>{speaker_display}</b> выбран ({lang_label.get(lang, lang.capitalize())}).\nТеперь пришлите текст для озвучки (до 500 символов).",
         parse_mode=ParseMode.HTML
     )
     await callback.answer()
 
-@router.message(F.text == "Мой баланс")
+@router.message(F.text == "💼 Мой баланс")
 async def handle_balance(message: Message):
     user_id = message.from_user.id
     left = get_left(user_id)
@@ -120,7 +158,7 @@ async def handle_balance(message: Message):
     )
     await message.answer(text, parse_mode="HTML")
 
-@router.message(F.text == "Купить озвучки")
+@router.message(F.text == "💰 Купить озвучки")
 @router.message(Command("buy"))
 async def buy_menu(message: Message):
     kb = InlineKeyboardBuilder()
@@ -175,12 +213,12 @@ async def process_successful_payment(message: Message):
             f"Теперь у вас {left} озвучек."
         )
 
-@router.message(F.text == "Помощь")
+@router.message(F.text == "🆘 Помощь")
 async def help_handler(message: Message):
     text = (
         "🤖 <b>Помощь по использованию бота</b>\n\n"
         "<b>Возможности:</b>\n"
-        "• Озвучивание любого текста выбранным голосом (до 500 символов за раз)\n"
+        "• Озвучивание любого текста выбранным языком и голосом (до 500 символов за раз)\n"
         "• 30 бесплатных озвучек\n"
         "• Возможность покупки дополнительных пакетов озвучек\n\n"
         "<b>Как пользоваться:</b>\n"
@@ -202,14 +240,10 @@ async def help_handler(message: Message):
     )
     await message.answer(text, parse_mode="HTML")
 
-@router.message(F.text == "Другие нейросети")
+@router.message(F.text == "📃 Другие нейросети")
 async def other_nets(message: Message):
     text = (
         "<b>Другие нейросети и боты:</b>\n\n"
-        "🤖 <a href='https://t.me/your_voicebot_en'>Озвучка на английском</a>\n"
-        "🎨 <a href='https://t.me/your_imagegen_bot'>Генерация картинок</a>\n"
-        "🎧 <a href='https://t.me/your_musicbot'>Генерация музыки</a>\n"
-        "💬 <a href='https://t.me/your_chatbot'>AI-чат</a>\n"
     )
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -239,14 +273,19 @@ async def tts_message(message: Message):
 
     set_last_request(user_id)
     lang = user_languages.get(user_id, "ru")
-    await message.answer(f"⏳ Генерирую озвучку голосом <b>{speaker.capitalize()}</b> ({'Русский' if lang == 'ru' else 'Английский'})...", parse_mode=ParseMode.HTML)
+    lang_label = {
+        "ru": "Русский", "en": "Английский", "de": "Немецкий", "fr": "Французский",
+        "es": "Испанский", "tt": "Татарский", "uz": "Узбекский",
+        "ba": "Башкирский", "xal": "Калмыцкий"
+    }
+    speaker_display = speaker_names.get(speaker, speaker.capitalize())
+    await message.answer(f"⏳ Генерирую озвучку голосом <b>{speaker_display}</b> ({lang_label.get(lang, lang.capitalize())})...", parse_mode=ParseMode.HTML)
     try:
-        # <--- ВАЖНО! Передаём язык в normalizer! --->
         normalized_text = normalize_numbers(text, lang=lang)
         audio_path = await synthesize_speech(normalized_text, speaker, user_id)
         add_used(user_id)
         increment_tts(user_id)
-        await message.answer_audio(FSInputFile(audio_path), title=f"Голос: {speaker.capitalize()}")
+        await message.answer_audio(FSInputFile(audio_path), title=f"Голос: {speaker_display}")
         import os
         os.remove(audio_path)
     except Exception as e:
