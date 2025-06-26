@@ -4,3 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+stats.db
+user_limits.db
+logs/
+*.log
