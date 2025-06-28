@@ -244,6 +244,7 @@ async def help_handler(message: Message):
 async def other_nets(message: Message):
     text = (
         "<b>Другие нейросети и боты:</b>\n\n"
+        '1️⃣ <a href="https://t.me/text_generation1_bot">Голос в текст</a>'
     )
     await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
 
