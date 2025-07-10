@@ -1,6 +1,7 @@
 import torch
 import soundfile as sf
 from config import SAMPLE_RATE, DEFAULT_SPEAKER, SPEAKERS
+from services.tts_queue import tts_queue
 
 print("Загрузка Silero TTS моделей...")
 
@@ -48,11 +49,19 @@ def get_lang_and_model(speaker):
         return "es", es_model
     return "ru", ru_model
 
-async def synthesize_speech(text, speaker, user_id):
-    lang, model = get_lang_and_model(speaker or DEFAULT_SPEAKER.get("ru"))
-    if not speaker:
-        speaker = DEFAULT_SPEAKER.get(lang, "baya")
-    audio = model.apply_tts(text, speaker=speaker, sample_rate=SAMPLE_RATE)
-    temp_file = f"tts_{user_id}.wav"
-    sf.write(temp_file, audio, SAMPLE_RATE)
-    return temp_file
+def synthesize_text_to_audio(text, speaker):
+    lang, model = get_lang_and_model(speaker)
+    audio = model.apply_tts(
+        text=text,
+        speaker=speaker,
+        sample_rate=SAMPLE_RATE
+    )
+    file_path = f"output_{speaker}.wav"
+    sf.write(file_path, audio, SAMPLE_RATE)
+    return file_path
+
+async def queue_tts_synthesis(text, speaker, user_id=None, notify_func=None):
+    async def job():
+        return synthesize_text_to_audio(text, speaker)
+
+    return await tts_queue.run(job, user_id=user_id, notify_func=notify_func)

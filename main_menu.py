@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardB
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 from config import PROVIDER_TOKEN, SPEAKERS
-from models.silero_tts import synthesize_speech
+from models.silero_tts import queue_tts_synthesis
 from utils.normalizer import normalize_numbers
 from services.analytics_db import (
     get_stats, increment_tts, increment_purchase, register_user
@@ -69,12 +69,12 @@ async def start(message: Message):
         f"🤖 <b>Привет, {user_name}!\n\n"
         "Я — твой голосовой помощник. Озвучу любой твой текст разными голосами и на разных языках — быстро и качественно!</b>\n\n"
         "Как пользоваться ботом:\n"
-        "1️⃣ Сначала выберите язык и голос (Озвучить текст)\n"
+        "1️⃣ Сначала выберите язык и голос (🗣 Озвучить текст)\n"
         "2️⃣ Затем отправьте текст (до 500 символов)\n"
         "3️⃣ Получите аудиофайл\n\n"
         "Вам доступно <b>30 бесплатных озвучек</b>!\n"
-        "Можно купить ещё озвучки (Купить озвучки)\n\n"
-        "Статистика по вашим озвучкам (Мой баланс)"
+        "Можно купить ещё озвучки (💰 Купить озвучки)\n\n"
+        "Статистика по вашим озвучкам (💼 Мой баланс)"
     )
     await message.answer(
         about_text,
@@ -82,9 +82,65 @@ async def start(message: Message):
         parse_mode=ParseMode.HTML
     )
 
+@router.message(Command("pay"))
+async def buy_menu_command(message: Message):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="10 озвучек — 100₽", callback_data="buy_10_1")
+    kb.button(text="30 озвучек — 200₽", callback_data="buy_30_2")
+    kb.button(text="50 озвучек — 300₽", callback_data="buy_50_3")
+    kb.adjust(1)
+    await message.answer("Выберите пакет для покупки:", reply_markup=kb.as_markup())
+
+@router.message(Command("balance"))
+async def handle_balance(message: Message):
+    user_id = message.from_user.id
+    left = get_left(user_id)
+    user_data = get_user_limit(user_id)
+    total_used = user_data.get("used", 0)
+    text = (
+        f"🗣 <b>Ваш баланс</b>\n\n"
+        f"Озвучек осталось: <b>{left}</b>\n"
+        f"Платных озвучек куплено: <b>{user_data.get('purchased', 0)}</b>\n"
+        f"Всего озвучек использовано: <b>{total_used}</b>\n"
+        f"<b>Ваш id:</b> <code>{user_id}</code>"
+    )
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("help"))
+async def help_handler(message: Message):
+    text = (
+        "🤖 <b>Помощь по использованию бота</b>\n\n"
+        "<b>Возможности:</b>\n"
+        "• Озвучивание любого текста выбранным языком и голосом (до 500 символов за раз)\n"
+        "• 30 бесплатных озвучек\n"
+        "• Возможность покупки дополнительных пакетов озвучек\n\n"
+        "<b>Как пользоваться:</b>\n"
+        "1. Нажмите кнопку \"Озвучить текст\", выберите язык и голос\n"
+        "2. Отправьте текст (до 500 символов)\n"
+        "3. Получите аудиофайл в ответ\n\n"
+        "<b>Баланс и покупки:</b>\n"
+        "• Узнать остаток озвучек — (💼 Мой баланс)\n"
+        "• Купить дополнительные озвучки — (💰 Купить озвучки)\n\n"
+        "<b>Частые вопросы:</b>\n"
+        "• <i>Не приходит озвучка?</i> — Проверьте, не превышен ли лимит, и подождите немного, чтобы не попасть под антифлуд\n"
+        "• <i>Не проходит оплата?</i> — Попробуйте ещё раз или напишите в поддержку\n\n"
+        "<b>Контакты поддержки:</b>\n"
+        "@skynet0001\n\n"
+        "<b>Приватность:</b>\n"
+        "Тексты пользователей не сохраняются и не передаются третьим лицам."
+    )
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(F.text == "📃 Другие нейросети")
+async def other_nets(message: Message):
+    text = (
+        "<b>Другие нейросети и боты:</b>\n\n"
+        #'1️⃣ <a href="https://t.me/text_generation1_bot">Голос в текст</a>'
+    )
+    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
+
 @router.message(F.text == "🗣 Озвучить текст")
 async def handle_tts(message: Message):
-    # Показываем выбор языка - все поддерживаемые языки Silero TTS
     kb = InlineKeyboardBuilder()
     kb.button(text="Русский 🇷🇺", callback_data="lang_ru")
     kb.button(text="Английский 🇬🇧", callback_data="lang_en")
@@ -96,6 +152,20 @@ async def handle_tts(message: Message):
         "Выберите язык для озвучки:",
         reply_markup=kb.as_markup()
     )
+
+@router.message(F.text == "💼 Мой баланс")
+async def handle_balance_old(message: Message):
+    await handle_balance(message)
+
+@router.message(F.text == "💰 Купить озвучки")
+async def buy_menu_old(message: Message):
+    await buy_menu_command(message)
+
+@router.message(F.text == "🆘 Помощь")
+async def help_handler_old(message: Message):
+    await help_handler(message)
+
+# ===== Остальное (озвучка, оплата, выбор языка/голоса и т.д.) =====
 
 @router.callback_query(F.data.startswith("lang_"))
 async def handle_language(callback: CallbackQuery):
@@ -120,7 +190,8 @@ async def handle_language(callback: CallbackQuery):
         f"Вы выбрали <b>{lang_label.get(lang, lang.capitalize())}</b> язык.\n\n"
         "Присылайте боту текст только на соответствующем языке. Текст на других языках бот игнорирует.\n\n"
         "Для изменения ударения добавьте '+' перед гласной.\n"
-        "Для добавления паузы '.-'.\n\n"
+        "Для добавления паузы '-'.\n\n"
+        "Для корректной озвучки аббревиатур, например МТС, напишите - эмтээс.\n\n"
         f"Теперь выберите голос для озвучивания на {lang_map.get(lang, lang)} языке:",
         parse_mode=ParseMode.HTML,
         reply_markup=kb.as_markup()
@@ -143,30 +214,6 @@ async def set_voice(callback: CallbackQuery):
         parse_mode=ParseMode.HTML
     )
     await callback.answer()
-
-@router.message(F.text == "💼 Мой баланс")
-async def handle_balance(message: Message):
-    user_id = message.from_user.id
-    left = get_left(user_id)
-    user_data = get_user_limit(user_id)
-    total_used = user_data.get("used", 0)
-    text = (
-        f"🗣 <b>Ваш баланс</b>\n\n"
-        f"Озвучек осталось: <b>{left}</b>\n"
-        f"Платных озвучек куплено: <b>{user_data.get('purchased', 0)}</b>\n"
-        f"Всего озвучек использовано: <b>{total_used}</b>\n"
-    )
-    await message.answer(text, parse_mode="HTML")
-
-@router.message(F.text == "💰 Купить озвучки")
-@router.message(Command("buy"))
-async def buy_menu(message: Message):
-    kb = InlineKeyboardBuilder()
-    kb.button(text="10 озвучек — 100₽", callback_data="buy_10_1")
-    kb.button(text="30 озвучек — 200₽", callback_data="buy_30_2")
-    kb.button(text="50 озвучек — 300₽", callback_data="buy_50_3")
-    kb.adjust(1)
-    await message.answer("Выберите пакет для покупки:", reply_markup=kb.as_markup())
 
 @router.callback_query(F.data.startswith("buy_"))
 async def buy_callback(call: CallbackQuery):
@@ -213,40 +260,6 @@ async def process_successful_payment(message: Message):
             f"Теперь у вас {left} озвучек."
         )
 
-@router.message(F.text == "🆘 Помощь")
-async def help_handler(message: Message):
-    text = (
-        "🤖 <b>Помощь по использованию бота</b>\n\n"
-        "<b>Возможности:</b>\n"
-        "• Озвучивание любого текста выбранным языком и голосом (до 500 символов за раз)\n"
-        "• 30 бесплатных озвучек\n"
-        "• Возможность покупки дополнительных пакетов озвучек\n\n"
-        "<b>Как пользоваться:</b>\n"
-        "1. Нажмите кнопку \"Озвучить текст\", выберите язык и голос\n"
-        "2. Отправьте текст (до 500 символов)\n"
-        "3. Получите аудиофайл в ответ\n\n"
-        "<b>Баланс и покупки:</b>\n"
-        "• Узнать остаток озвучек — \"Мой баланс\"\n"
-        "• Купить дополнительные озвучки — \"Купить озвучки\"\n\n"
-        "<b>Перезагрузить бота:</b>\n"
-        "•/start\n\n"
-        "<b>Частые вопросы:</b>\n"
-        "• <i>Не приходит озвучка?</i> — Проверьте, не превышен ли лимит, и подождите немного, чтобы не попасть под антифлуд\n"
-        "• <i>Не проходит оплата?</i> — Попробуйте ещё раз или напишите в поддержку\n\n"
-        "<b>Контакты поддержки:</b>\n"
-        "@skynet0001\n\n"
-        "<b>Приватность:</b>\n"
-        "Тексты пользователей не сохраняются и не передаются третьим лицам."
-    )
-    await message.answer(text, parse_mode="HTML")
-
-@router.message(F.text == "📃 Другие нейросети")
-async def other_nets(message: Message):
-    text = (
-        "<b>Другие нейросети и боты:</b>\n\n"
-    )
-    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
-
 @router.message()
 async def tts_message(message: Message):
     user_id = message.from_user.id
@@ -258,7 +271,7 @@ async def tts_message(message: Message):
 
     speaker = user_speakers.get(user_id)
     if not speaker:
-        await message.answer("Сначала выберите язык и голос через кнопку 'Озвучить текст'.")
+        await message.answer("Сначала выберите язык и голос через кнопку (🗣 Озвучить текст).")
         return
     text = message.text.strip()
     if not text:
@@ -268,7 +281,7 @@ async def tts_message(message: Message):
         await message.answer("⚠️ Текст слишком длинный! Максимум 500 символов.")
         return
     if not can_speak(user_id):
-        await message.answer("У вас закончились бесплатные и купленные озвучки.\nПополните баланс через 'Купить озвучки'.")
+        await message.answer("У вас закончились бесплатные и купленные озвучки.\nПополните баланс через (💰 Купить озвучки).")
         return
 
     set_last_request(user_id)
@@ -282,7 +295,12 @@ async def tts_message(message: Message):
     await message.answer(f"⏳ Генерирую озвучку голосом <b>{speaker_display}</b> ({lang_label.get(lang, lang.capitalize())})...", parse_mode=ParseMode.HTML)
     try:
         normalized_text = normalize_numbers(text, lang=lang)
-        audio_path = await synthesize_speech(normalized_text, speaker, user_id)
+        audio_path = await queue_tts_synthesis(
+            normalized_text,
+            speaker,
+            user_id=user_id,
+            notify_func=message.bot.send_message
+        )
         add_used(user_id)
         increment_tts(user_id)
         await message.answer_audio(FSInputFile(audio_path), title=f"Голос: {speaker_display}")
