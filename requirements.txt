@@ -1,6 +1,7 @@
 aiogram>=3.0.0
-#pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+# для установки используйте: pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
 soundfile
 num2words
 omegaconf
 python-dotenv
+pydub  # для конвертации аудиоформатов (mp3/ogg), требует ffmpeg установленным в системе

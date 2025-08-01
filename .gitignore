@@ -8,3 +8,4 @@ stats.db
 user_limits.db
 logs/
 *.log
+blocked_words.txt
