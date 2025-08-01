@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 DB_FILE = Path("user_limits.db")
-FREE_LIMIT = 20  # 30 бесплатных озвучек
+FREE_LIMIT = 20  # 20 бесплатных озвучек
 FLOOD_SECONDS = 5
 
 def get_conn():

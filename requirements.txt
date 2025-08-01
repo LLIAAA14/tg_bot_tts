@@ -4,4 +4,3 @@ soundfile
 num2words
 omegaconf
 python-dotenv
-pydub  # для конвертации аудиоформатов (mp3/ogg), требует ffmpeg установленным в системе

@@ -16,10 +16,20 @@ from services.user_limits_db import (
 from pathlib import Path
 from services.analytics_db import log_event
 
+def load_blocked_words(path: str = "blocked_words.txt") -> set:
+    file = Path(path)
+    if not file.exists():
+        return set()
+    return set(
+        line.strip().lower()
+        for line in file.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    )
+
+BLOCKED_WORDS = load_blocked_words()
 router = Router()
 user_speakers = {}
 user_languages = {}
-user_audio_formats = {}  # Новый: формат аудио (wav/mp3/ogg)
 
 speaker_names = {
     # RU
@@ -53,17 +63,6 @@ speaker_names = {
     "es_2": "👨Педро"
 }
 
-def load_blocked_words(path: str = "blocked_words.txt") -> set:
-    file = Path(path)
-    if not file.exists():
-        return set()
-    return set(
-        line.strip().lower()
-        for line in file.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
-    )
-
-BLOCKED_WORDS = load_blocked_words()
 def get_main_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -179,7 +178,7 @@ async def buy_menu_old(message: Message):
 async def help_handler_old(message: Message):
     await help_handler(message)
 
-# ===== Остальное (озвучка, оплата, выбор языка/голоса, формат и т.д.) =====
+# ===== Остальное (озвучка, оплата, выбор языка/голоса и т.д.) =====
 
 @router.callback_query(F.data.startswith("lang_"))
 async def handle_language(callback: CallbackQuery):
@@ -204,7 +203,7 @@ async def handle_language(callback: CallbackQuery):
         f"Вы выбрали <b>{lang_label.get(lang, lang.capitalize())}</b> язык.\n\n"
         "Присылайте боту текст только на соответствующем языке. Текст на других языках бот игнорирует.\n\n"
         "Для изменения ударения добавьте '+' перед гласной.\n"
-        "Для добавления паузы '-'.\n\n"
+        "Для добавления паузы '.-'.\n\n"
         "Для корректной озвучки аббревиатур, например МТС, напишите - эмтээс.\n\n"
         f"Теперь выберите голос для озвучивания на {lang_map.get(lang, lang)} языке:",
         parse_mode=ParseMode.HTML,
@@ -217,32 +216,14 @@ async def set_voice(callback: CallbackQuery):
     user_id = callback.from_user.id
     speaker = callback.data.replace("voice_", "")
     user_speakers[user_id] = speaker
-
+    lang = user_languages.get(user_id, "ru")
+    lang_label = {
+        "ru": "Русский", "en": "Английский", "de": "Немецкий", "fr": "Французский",
+        "es": "Испанский"
+    }
     speaker_display = speaker_names.get(speaker, speaker.capitalize())
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🎵 WAV", callback_data="format_wav")
-    kb.button(text="🎷 MP3", callback_data="format_mp3")
-    kb.button(text="🎹 OGG", callback_data="format_ogg")
-    kb.adjust(3)
-
     await callback.message.answer(
-        f"🗣 Голос <b>{speaker_display}</b> выбран.\n\nТеперь выберите <b>формат аудиофайла</b>:",
-        parse_mode=ParseMode.HTML,
-        reply_markup=kb.as_markup()
-    )
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("format_"))
-async def set_format(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    fmt = callback.data.replace("format_", "")
-    user_audio_formats[user_id] = fmt
-
-    speaker = user_speakers.get(user_id)
-    speaker_display = speaker_names.get(speaker, speaker.capitalize())
-
-    await callback.message.answer(
-        f"🗣 Формат <b>{fmt.upper()}</b> выбран.\nТеперь пришлите текст для озвучки (до 500 символов).",
+        f"✅ Голос <b>{speaker_display}</b> выбран ({lang_label.get(lang, lang.capitalize())}).\nТеперь пришлите текст для озвучки (до 500 символов).",
         parse_mode=ParseMode.HTML
     )
     await callback.answer()
@@ -305,7 +286,6 @@ async def tts_message(message: Message):
     if not speaker:
         await message.answer("Сначала выберите язык и голос через кнопку (🗣 Озвучить текст).")
         return
-
     text = message.text.strip()
     lower_text = text.lower()
     for word in BLOCKED_WORDS:
@@ -317,6 +297,7 @@ async def tts_message(message: Message):
             )
             await message.answer("⚠️ Текст содержит запрещённые слова и не может быть озвучен.")
             return
+
     if not text:
         await message.answer("Пожалуйста, отправьте текст для озвучки.")
         return
@@ -335,21 +316,14 @@ async def tts_message(message: Message):
         "ba": "Башкирский", "xal": "Калмыцкий"
     }
     speaker_display = speaker_names.get(speaker, speaker.capitalize())
-
-    audio_format = user_audio_formats.get(user_id, "wav")  # <-- Новый формат, по умолчанию wav
-
-    await message.answer(
-        f"⏳ Генерирую озвучку голосом <b>{speaker_display}</b> ({lang_label.get(lang, lang.capitalize())}) в формате <b>{audio_format.upper()}</b>...",
-        parse_mode=ParseMode.HTML
-    )
+    await message.answer(f"⏳ Генерирую озвучку голосом <b>{speaker_display}</b> ({lang_label.get(lang, lang.capitalize())})...", parse_mode=ParseMode.HTML)
     try:
         normalized_text = normalize_numbers(text, lang=lang)
         audio_path = await queue_tts_synthesis(
             normalized_text,
             speaker,
             user_id=user_id,
-            notify_func=message.bot.send_message,
-            audio_format=audio_format  # <-- Передаём формат
+            notify_func=message.bot.send_message
         )
         add_used(user_id)
         increment_tts(user_id)
